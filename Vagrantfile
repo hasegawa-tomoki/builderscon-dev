@@ -36,10 +36,10 @@ Vagrant.configure(2) do |config|
     node.vm.provision "ansible" do |ansible|
       ansible.groups = { "dev" => ["builderscon"] }
       ansible.playbook = "provisioning/dev.yml"
-      ansible.tags = [ "builderscon" ]
+      #ansible.tags = [ "builderscon" ]
       ansible.raw_arguments = [
-#        "-v",
-        "--diff",
+      #  "-v",
+      #  "--diff",
       ]
     end
   end
