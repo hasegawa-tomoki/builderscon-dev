@@ -1,0 +1,15 @@
+- name: "Install MySQL server"
+  apt: pkg={{item}} state=present
+  with_items:
+    - mysql-server
+
+- name: "Enable MySQL server"
+  service: name=mysql enabled=yes
+
+- name: "Check root user needs tweak"
+  shell: echo "SELECT User,Host FROM mysql.user where User='root' and Host='localhost';"|mysql -uroot|wc -l
+  register: result
+- name: "Tweak root user"
+  shell: echo "DROP USER 'root'@'localhost';CREATE USER 'root'@'%' IDENTIFIED BY '';GRANT ALL PRIVILEGES ON *.* TO 'root'@'%';FLUSH PRIVILEGES;" | mysql -uroot
+  when: result.stdout == '1'
+

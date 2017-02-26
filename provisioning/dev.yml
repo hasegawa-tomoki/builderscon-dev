@@ -1,0 +1,14 @@
+- hosts: all
+  become: yes
+  become_user: root
+  roles:
+    - { name: common, tags: [common] }
+    - { name: apache, tags: [apache] }
+    - { name: mysql/server, tags: [mysql] }
+    - { name: mysql/client, tags: [mysql] }
+    - { name: mysql/database, tags: [mysql] }
+    - { name: redis, tags: [redis] }
+    - { name: pyenv, tags: [pyenv] }
+    - { name: builderscon, tags: [builderscon] }
+
+

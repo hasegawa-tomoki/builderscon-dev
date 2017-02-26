@@ -1,0 +1,113 @@
+# Create documentroot
+- name: "Create directory"
+  file:
+    path: /var/www/builderscon
+    state: directory
+# # Create virtualenv
+# - name: "Check if virtualenv installed"
+#   shell: . ~/.bashrc; pyenv versions|grep builderscon|wc -l
+#   register: result
+# - name: "Create virtualenv"
+#   shell: . ~/.bashrc; pyenv virtualenv 2.7.13 builderscon
+#   when: result.stdout == '0'
+# - name: "Set system version to builderscon"
+#   shell: . ~/.bashrc; pyenv local builderscon
+#   args:
+#     chdir: /var/www/bc
+
+- name: "Install dependency modules."
+  shell: ". ~/.bashrc;pip install {{item}}"
+  with_items:
+    - gunicorn
+    - Babel
+    - certifi
+    - feedparser
+    - flask
+    - flask_babel
+    - flask_oauth
+    - flask_session
+    - jinja2
+    - iso8601
+    - py-gfm
+    - python-memcached
+    - python-oembed
+    - pytz
+    - redis
+    - urllib3
+    - wsgi-request-logger
+    - werkzeug
+
+# - name: "Create go directory"
+#   file:
+#     dest: /var/go
+#     state: directory
+
+- name: "Download & extract golang"
+  unarchive:
+    src: https://storage.googleapis.com/golang/go1.8.linux-amd64.tar.gz
+    dest: /usr/local
+    remote_src: True
+
+- name: "Make link to go binary"
+  file:
+    src: /usr/local/go/bin/go
+    dest: /usr/local/bin/go
+    state: link
+
+- name: "Add GOPATH to .bashrc"
+  lineinfile:
+    dest: '{{item}}/.bashrc'
+    line: 'export GOPATH=/var/go'
+  with_items:
+    - /home/ubuntu
+    - /root
+
+- name: "Create GOROOT"
+  file:
+    dest: /usr/local/go
+    state: directory
+
+- name: "Create GOPATH"
+  file:
+    dest: /var/go/src/github.com/builderscon
+    state: directory
+    recurse: yes
+
+- name: "Clone octav"
+  git:
+    repo: https://github.com/builderscon/octav.git
+    dest: /var/go/src/github.com/builderscon/octav
+
+- name: "Make glide"
+  shell: . ~/.bashrc; make glide
+  args:
+    chdir: /var/go/src/github.com/builderscon/octav/octav
+
+- name: "Make installdeps"
+  shell: . ~/.bashrc; make installdeps
+  args:
+    chdir: /var/go/src/github.com/builderscon/octav/octav
+    creates: /var/go/src/github.com/builderscon/octav/octav/vendor/google.golang.org/api
+ 
+- name: "Build octav"
+  shell: . ~/.bashrc; go build -tags debug0 cmd/octav/octav.go
+  args:
+    chdir: /var/go/src/github.com/builderscon/octav/octav
+    creates: /var/go/src/github.com/builderscon/octav/octav/octav 
+
+- name: "Check if octav database already exists"
+  shell: echo show databases|mysql -uroot|grep octav|wc -l
+  register: result
+- name: "Create database for octav"
+  shell: make initdb
+  args:
+    chdir: /var/go/src/github.com/builderscon/octav/octav
+  when: result.stdout == '0'
+
+- name: "Check if client exists"
+  shell: echo "select * from clients where eid='{{octav.client.eid}}'"|mysql -uroot octav|grep {{octav.client.eid}}|wc -l
+  register: result
+- name: "Create clients"
+  shell: echo "insert into clients (eid, secret, name, created_on) values ('{{octav.client.eid}}', '{{octav.client.secret}}', '{{octav.client.name}}', '{{octav.client.created_on}}')"|mysql -uroot octav
+  when: result.stdout == '0'
+

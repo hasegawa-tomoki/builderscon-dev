@@ -1,0 +1,12 @@
+/var/log/drupal.log
+{
+	weekly
+	rotate 14
+	missingok
+	notifempty
+	delaycompress
+	compress
+	postrotate
+		invoke-rc.d rsyslog rotate > /dev/null
+	endscript
+}

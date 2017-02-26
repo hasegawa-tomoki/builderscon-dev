@@ -1,0 +1,25 @@
+databases:
+  - name: builderscon
+    user: builderscon
+    password: rKMp6l7n8FKFe5VV
+
+apache:
+  server_name: builderscon-dev
+
+builderscon:
+  fqdn: dev.builderscon.io
+  docroot: /var/www/dev.builderscon.io
+
+postfix:
+  myhostname: dev.builderscon.io
+  mydomainname: dev.builderscon.io
+  mydestination: dev.builderscon.io
+  mynetworks: 192.168.0.0/24
+
+octav:
+  client:
+    eid: ofLEMknIQ3SQA03b
+    secret: XOAWjSh2YzIIKS2T
+    name: builderscon-dev
+    created_on: 2017-01-01 00:00:00
+

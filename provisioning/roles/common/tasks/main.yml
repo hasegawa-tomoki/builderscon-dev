@@ -1,0 +1,82 @@
+- name: "Set host lookup order"
+  lineinfile:
+    dest: "/etc/nsswitch.conf"
+    state: present
+    backrefs: yes
+    regexp: '^\s*hosts:'
+    line: 'hosts:          files wins dns'
+
+# Disable IPv6
+- name: "add net.ipv6.conf.all.disable_ipv6 = 1"
+  lineinfile:
+    dest: '/etc/sysctl.conf'
+    state: present
+    line: "net.ipv6.conf.all.disable_ipv6 = 1"
+- name: "add net.ipv6.conf.default.disable_ipv6 = 1"
+  lineinfile:
+    dest: '/etc/sysctl.conf'
+    state: present
+    line: "net.ipv6.conf.default.disable_ipv6 = 1"
+- name: "Apply sysctl.conf"
+  command: sysctl -p
+
+# Configure user
+- name: "Copy ~/.vimrc"
+  copy: src=".vimrc" dest="{{item.home}}/.vimrc" owner={{item.name}} group={{item.group}} mode=0644 backup=yes
+  with_items: 
+    - { home: /root, name: root, group: root }
+    - { home: /home/ubuntu, name: ubuntu, group: ubuntu }
+- name: "Add rm alias"
+  lineinfile:
+    dest: "{{item.home}}/.bashrc"
+    state: present
+    line: "alias rm='rm -i'"
+  with_items: 
+    - { home: /root, name: root, group: root }
+    - { home: /home/ubuntu, name: ubuntu, group: ubuntu }
+
+# Configure user root
+- name: "Add root bash prompt"
+  lineinfile:
+    dest: "/root/.bashrc"
+    state: present
+    line: 'PS1="\[\033[1;36m\][\u@\h \w]$\[\033[0m\] "'
+
+# Prepare for package install
+- name: "apt-get update"
+  apt: update_cache=yes
+
+# Install other basic packages
+- name: "Install basic packages"
+  apt: pkg={{item}} state=present
+  with_items:
+    - vim
+    - sysv-rc-conf
+    - unzip
+    - software-properties-common
+    - git
+
+# Install and configure mail
+- name: "Install postfix"
+  apt: pkg=postfix state=present
+- name: "Configure postfix configuration: myhostname"
+  lineinfile: dest="/etc/postfix/main.cf" state=present regexp='^\s*myhostname' line='myhostname = {{postfix.myhostname}}'
+  notify: reboot_postfix
+- name: "Configure postfix configuration: mydomainname"
+  lineinfile: dest="/etc/postfix/main.cf" state=present regexp='^\s*mydomainname' line='mydomainname = {{postfix.mydomainname}}'
+  notify: reboot_postfix
+- name: "Configure postfix configuration: mydestination"
+  lineinfile: dest="/etc/postfix/main.cf" state=present regexp='^\s*mydestination' line='mydestination = {{postfix.mydestination}}, localhost, localhost.localdomain, localhost'
+  notify: reboot_postfix
+- name: "Configure postfix configuration: mynetworks"
+  lineinfile: dest="/etc/postfix/main.cf" state=present regexp='^\s*mynetworks' line='mynetworks = 127.0.0.0/8 [::ffff:127.0.0.0]/104 [::1]/128 192.168.0.0/24 {{postfix.mynetworks}}'
+  notify: reboot_postfix
+- name: "Install mailutils"
+  apt: pkg=mailutils state=present
+
+# Install ntp
+- name: "Install ntp"
+  apt: pkg=ntp state=present
+- name: "Put ntp.conf"
+  copy: src=ntp.conf dest=/etc/ntp.conf owner=root group=root mode=0644 backup=yes
+  notify: reboot_ntp

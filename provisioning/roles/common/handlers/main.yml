@@ -1,0 +1,7 @@
+- name: reboot_postfix
+  action: service name=postfix state=restarted
+- name: reboot_ntp
+  action: service name=ntp state=restarted
+- name: reboot_networking
+  action: service name=networking state=restarted
+

@@ -1,0 +1,98 @@
+- name: "Install apache2"
+  apt: pkg=apache2 state=present
+
+- name: "Add ServerName to apache2.conf"
+  lineinfile:
+    dest: "/etc/apache2/apache2.conf"
+    state: present
+    line: "ServerName {{apache.server_name}}"
+  notify:
+  - reboot_apache
+
+- name: "Enable apache"
+  service: name=apache2 enabled=yes
+
+# Enable mod_ssl
+- name: "Check if mod_ssl already enabled"
+  stat: path=/etc/apache2/mods-enabled/ssl.load
+  register: ssl_enabled
+- name: "Enable mod_ssl"
+  shell: a2enmod ssl
+  when: not ssl_enabled.stat.exists
+  notify: reboot_apache
+
+# Enable mod_proxy
+- name: "Check if mod_proxy already enabled"
+  stat: path=/etc/apache2/mods-enabled/proxy.load
+  register: proxy_enabled
+- name: "Enable mod_proxy"
+  shell: a2enmod proxy
+  when: not proxy_enabled.stat.exists
+  notify: reboot_apache
+
+# Enable mod_proxy_http
+- name: "Check if mod_proxy_http already enabled"
+  stat: path=/etc/apache2/mods-enabled/proxy_http.load
+  register: proxy_http_enabled
+- name: "Enable mod_proxy_http"
+  shell: a2enmod proxy_http
+  when: not proxy_http_enabled.stat.exists
+  notify: reboot_apache
+
+# Enable mod_rewrite
+- name: "Check if mod_rewrite already enabled"
+  stat: path=/etc/apache2/mods-enabled/rewrite.load
+  register: rewrite_enabled
+- name: "Enable mod_rewrite"
+  shell: a2enmod rewrite
+  when: not rewrite_enabled.stat.exists
+  notify: reboot_apache
+
+# Enable mod_headers
+- name: "Check if mod_headers already enabled"
+  stat: path=/etc/apache2/mods-enabled/headers.load
+  register: headers_enabled
+- name: "Enable mod_headers"
+  shell: a2enmod headers
+  when: not headers_enabled.stat.exists
+  notify: reboot_apache
+
+# Remove ubuntu default files / directories
+- name: "Remove default ssl vhost config file"
+  file: path=/etc/apache2/sites-available/default-ssl.conf state=absent
+  notify:
+  - reboot_apache
+- name: "Remove default index.html"
+  file: path=/var/www/html/index.html state=absent
+  notify:
+  - reboot_apache
+- name: "Remove default html directory"
+  file: path=/var/www/html state=absent
+  notify:
+  - reboot_apache
+
+# Install new default files / directories
+- name: "Install default vhost config file including ssl"
+  copy: src=000-default.conf dest=/etc/apache2/sites-available/000-default.conf owner=root group=root mode=0644 backup=yes
+  notify:
+  - reboot_apache
+- name: "Check if vhost file in sites-enabled"
+  stat: path=/etc/apache2/sites-enabled/000-default.conf
+  register: sites_enabled
+- name: "Enable default vhost config using a2ensite"
+  shell: a2ensite 000-default
+  when: (not sites_enabled.stat.exists) or (not sites_enabled.stat.islnk)
+  notify:
+  - reboot_apache
+- name: "Create default directory"
+  file: path=/var/www/default state=directory owner=root group=root mode=0755
+  notify:
+  - reboot_apache
+- name: "Touch default index.html file"
+  file: path=/var/www/default/index.html state=touch owner=root group=root mode=0644
+  notify:
+  - reboot_apache
+
+# Configure logrotate
+- name: "Put logrotate config file"
+  copy: src=logrotate.d/apache2 dest=/etc/logrotate.d/apache2 owner=root group=root mode=0644 backup=yes

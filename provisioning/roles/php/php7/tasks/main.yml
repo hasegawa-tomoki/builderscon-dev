@@ -1,0 +1,31 @@
+#- name: "Add repository for php7"
+#  apt_repository: repo='ppa:ondrej/php'
+
+#  apt: name={{item}} state=present update_cache=yes
+
+- name: "Install php7"
+  apt: name={{item}} state=present
+  with_items:
+    - php7.0
+    - php7.0-cli
+    - php7.0-common
+    - php7.0-curl
+    - php7.0-dev
+    - php7.0-gd
+    - php7.0-gmp
+    - php7.0-json
+    - php7.0-ldap
+    - php7.0-mysql
+    - php7.0-opcache
+    - php7.0-pspell
+    - php7.0-readline
+# snmp module is broken
+#    - php7.0-snmp
+    - php7.0-sqlite3
+    - php7.0-tidy
+    - php7.0-xml
+    - php7.0-xmlrpc
+    - libapache2-mod-php7.0
+  notify: reboot_apache
+
+

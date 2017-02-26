@@ -1,0 +1,69 @@
+- name: "Install dependency packages"
+  apt:
+    name: "{{item}}"
+  with_items:
+    - gcc
+    - make
+    - openssl
+    - libssl-dev
+    - libbz2-dev
+    - libreadline-dev
+    - libsqlite3-dev
+
+- name: "Install pyenv"
+  git:
+    repo: git://github.com/yyuu/pyenv.git
+    dest: /usr/local/pyenv
+
+- name: "Create directories"
+  file:
+    path: "/usr/local/pyenv/{{item}}"
+    state: directory
+  with_items:
+    - versions
+    - shims
+
+- name: "Clone pyenv-virtualenv"
+  git:
+    repo: git://github.com/yyuu/pyenv-virtualenv.git
+    dest: /usr/local/pyenv/plugins/pyenv-virtualenv
+
+- name: "Add PYENV_ROOT to .bashrc"
+  lineinfile:
+    dest: '{{item}}/.bashrc'
+    line: 'export PYENV_ROOT="/usr/local/pyenv"'
+  with_items:
+    - /home/ubuntu
+    - /root
+- name: "Add path to .bashrc"
+  lineinfile:
+    dest: '{{item}}/.bashrc'
+    line: 'export PATH="${PYENV_ROOT}/shims:${PYENV_ROOT}/bin:${PATH}"'
+  with_items:
+    - /home/ubuntu
+    - /root
+- name: "Add init to .bashrc"
+  lineinfile:
+    dest: '{{item}}/.bashrc'
+    line: 'eval "$(pyenv init -)"'
+  with_items:
+    - /home/ubuntu
+    - /root
+- name: "Add virtualenv-init to .bashrc"
+  lineinfile:
+    dest: '{{item}}/.bashrc'
+    line: 'eval "$(pyenv virtualenv-init -)"'
+  with_items:
+    - /home/ubuntu
+    - /root
+
+- name: "Check if 2.7.13 installed"
+  shell: . ~/.bashrc; pyenv versions|grep 2.7.13|wc -l
+  register: result
+- name: "Install 2.7.13"
+  shell: . ~/.bashrc; pyenv install -v 2.7.13
+  when: result.stdout == '0'
+- name: "Set system version to 2.7.13"
+  shell: . ~/.bashrc; pyenv global 2.7.13
+
+

@@ -1,0 +1,93 @@
+#!/usr/bin/php
+<?php
+function get_info(){
+	// システム全体にあるドライブ一覧を取得
+	$outs = null;
+	exec("LANG=C fdisk -l 2>/dev/null|grep \"Disk.*dev/sd*\"|sort", $outs);
+	$devices = array();
+	foreach ($outs as $out){
+		// 出力を分割 1: ドライブ名(/dev/sdxx:), 2 & 3: 容量(500.1 GB)
+		$cols = explode(" ", $out);
+		$drive_strings = explode('/', $cols[1]);
+		$drive = str_replace(':', '', array_pop($drive_strings));
+		$devices[$drive] = array('size' => $cols[2].' '.str_replace(',', '', $cols[3]), 'md' => null);
+	}
+	// md ごとのドライブ一覧作成
+	$outs = null;
+	exec("cat /proc/mdstat |grep \"^md\"", $outs);
+	$mds = array();
+	foreach ($outs as $out){
+		$cols = explode(" ", $out, 5);
+		$drives = explode(" ", $cols[4]);
+		for ($i = 0; $i < count($drives); $i++){
+			#$drives[$i] = ereg_replace('[0-9]\[[0-9]\]$', '', $drives[$i]);
+			$drives[$i] = preg_replace('/[0-9]\[[0-9]\]$/', '', $drives[$i]);
+			$devices[$drives[$i]]['md'] = $cols[0];
+		}
+		$mds[$cols[0]] = $drives;
+	}
+	
+	// デバイスを調べる
+	define('DEVICE_ROOT', "/sys/class/scsi_device");
+	$d = dir(DEVICE_ROOT);
+	while (false !== ($entry = $d->read())){
+		if ($entry == '.' or $entry == '..'){ continue; }
+		$ds = dir(DEVICE_ROOT.'/'.$entry.'/device');
+		$device = null;
+		while (false !== ($subentry = $ds->read())){
+			if (substr($subentry, 0, 5) == 'block'){
+				#$device = substr($subentry, 6);
+				$ds2 = dir(DEVICE_ROOT.'/'.$entry.'/device/'.$subentry);
+				while (false !== ($subsubentry = $ds2->read())){
+					if ($subsubentry !== "." and $subsubentry !== ".."){ $device = $subsubentry; break; }
+				}
+			}
+		}
+		if ($device){ $devices[$device]['scsi_device'] = $entry; }
+	}
+	return $devices;
+}
+
+$devices = get_info();
+
+switch ($argc){
+	case 1:
+		// 引数無し
+		break;
+	case 2:
+		// 引数あり
+		$name = $argv[1];
+		
+		// 引数のデバイスがあってmdでなければ取り外し
+		if (array_key_exists($name, $devices)){
+			if (is_null($devices[$name]['md'])){
+				$cmd = sprintf("echo 1 > /sys/class/scsi_device/%s/device/delete", $devices[$name]['scsi_device']);
+				system($cmd);
+				printf("\n%s (%s) を取り外しました。\n\n", $name, $devices[$name]['scsi_device']);
+				$devices = get_info();
+			} else {
+				printf("%s は %s の一部なので取り外ししませんでした。\n\n", $name, $devices[$name]['md']);
+			}
+		} elseif ($name == "scan"){
+			system('for i in $(ls /sys/class/scsi_host/host*/scan);do echo 0 - 0 > $i;done');
+			$devices = get_info();
+		}
+
+		break;
+}
+
+
+// 結果を出力
+foreach($devices as $key => $device){
+	if (count($device) !== 3){ return; }
+	printf("%4s %10s %4s %s\n", $key, $device['size'], $device['md'], $device['scsi_device']);
+}
+
+echo "\n\n使用法: disk_list.php [オプション]\n\n";
+//echo "Remove device: echo 1 > /sys/class/scsi_device/X:X:X:X/device/delete\n";
+//echo "Scan device  : ./scan_scsi.sh\n";
+echo "  sdX   指定したドライブを取り外します。\n";
+echo "  scan  ドライブをスキャンします。\n";
+echo "\n";
+
+
